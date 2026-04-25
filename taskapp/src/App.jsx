@@ -1,7 +1,14 @@
 import { useState, useEffect, useRef } from "react";
+import { createClient } from "@supabase/supabase-js";
 
+// ── Supabase ──────────────────────────────────────────────────────────────────
+const SUPABASE_URL = "https://cujwsufypkqvczuxirha.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1andzdWZ5cGtxdmN6dXhpcmhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwODI0NDAsImV4cCI6MjA5MjY1ODQ0MH0.OazSn2WwCr-QWXm9DfP7j4JJehY20ETt1OvxNX0zFWM";
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── Theme ─────────────────────────────────────────────────────────────────────
 const makeTheme = (dark) => dark ? {
-  dark:true, bg:"#000000", g1:"rgba(28,28,30,0.78)", g2:"rgba(44,44,46,0.68)", g3:"rgba(58,58,60,0.55)",
+  dark:true, bg:"#000000", g1:"rgba(28,28,30,0.78)", g3:"rgba(58,58,60,0.55)",
   b1:"rgba(255,255,255,0.09)", bTop:"rgba(255,255,255,0.20)",
   text:"#FFFFFF", textSub:"rgba(255,255,255,0.70)", textFaint:"rgba(255,255,255,0.32)", textGhost:"rgba(255,255,255,0.14)",
   sep:"rgba(255,255,255,0.06)", tabBg:"rgba(8,8,10,0.82)", tabBorder:"rgba(255,255,255,0.10)",
@@ -20,7 +27,7 @@ const makeTheme = (dark) => dark ? {
   statBg:(a)=>`${a}1A`, statBorder:(a)=>`${a}40`,
   suggBg:"rgba(22,22,24,0.99)", suggBorder:"rgba(255,255,255,0.12)", suggHov:"rgba(255,255,255,0.07)",
 } : {
-  dark:false, bg:"#F2F2F7", g1:"rgba(255,255,255,0.85)", g2:"rgba(248,248,253,0.80)", g3:"rgba(235,235,240,0.90)",
+  dark:false, bg:"#F2F2F7", g1:"rgba(255,255,255,0.85)", g3:"rgba(235,235,240,0.90)",
   b1:"rgba(0,0,0,0.07)", bTop:"rgba(255,255,255,0.95)",
   text:"#1C1C1E", textSub:"rgba(0,0,0,0.60)", textFaint:"rgba(0,0,0,0.38)", textGhost:"rgba(0,0,0,0.12)",
   sep:"rgba(0,0,0,0.06)", tabBg:"rgba(242,242,247,0.88)", tabBorder:"rgba(0,0,0,0.10)",
@@ -53,14 +60,6 @@ const pc=(name,dark)=>{
 };
 const PRIO_DARK={high:"#FF453A",medium:"#FF9F0A",low:"#30D158"};
 const PRIO_LIGHT={high:"#FF3B30",medium:"#FF9500",low:"#34C759"};
-const SAMPLE=[
-  {id:1,title:"Send proposal draft to client",project:"Brand Refresh",spoc:"Anika M.",due:"",priority:"high",done:false,notifyHrs:24},
-  {id:2,title:"Review Q2 metrics deck",project:"Growth Strategy",spoc:"Rohan S.",due:new Date(Date.now()+86400000).toISOString().slice(0,10),priority:"high",done:false,notifyHrs:24},
-  {id:3,title:"Follow up on contract sign-off",project:"Brand Refresh",spoc:"Priya K.",due:new Date(Date.now()+3*86400000).toISOString().slice(0,10),priority:"medium",done:false,notifyHrs:24},
-  {id:4,title:"Set up analytics pipeline",project:"Tech Infra",spoc:"Dev Team",due:new Date(Date.now()+5*86400000).toISOString().slice(0,10),priority:"medium",done:false,notifyHrs:24},
-  {id:5,title:"Kickoff call recap notes",project:"Growth Strategy",spoc:"Anika M.",due:new Date(Date.now()-86400000).toISOString().slice(0,10),priority:"low",done:true,notifyHrs:24},
-  {id:6,title:"Design system token audit",project:"Tech Infra",spoc:"Dev Team",due:new Date(Date.now()+2*86400000).toISOString().slice(0,10),priority:"high",done:false,notifyHrs:24},
-];
 
 // ── Notifications ─────────────────────────────────────────────────────────────
 function scheduleNotifications(tasks){
@@ -135,7 +134,7 @@ function TaskRow({task,onToggle,onDelete,second,T}){
   const [checking,setChecking]=useState(false);
   const rel=relDate(task.due,T);
   const PRIO=T.dark?PRIO_DARK:PRIO_LIGHT;
-  const doToggle=()=>{setChecking(true);setTimeout(()=>{setChecking(false);onToggle(task.id);},280);};
+  const doToggle=()=>{setChecking(true);setTimeout(()=>{setChecking(false);onToggle(task.id,!task.done);},280);};
   const doDelete=()=>{setExiting(true);setTimeout(()=>onDelete(task.id),310);};
   return(
     <div style={{display:"flex",alignItems:"center",gap:12,padding:"13px 16px",borderBottom:`0.5px solid ${T.sep}`,opacity:exiting?0:1,transform:exiting?"translateX(36px) scale(0.96)":"translateX(0) scale(1)",transition:"opacity 0.3s ease, transform 0.3s cubic-bezier(0.4,0,1,1)"}}>
@@ -158,7 +157,7 @@ function TaskRow({task,onToggle,onDelete,second,T}){
   );
 }
 
-// ── Quick Add (inline per group) ──────────────────────────────────────────────
+// ── Quick Add ─────────────────────────────────────────────────────────────────
 function QuickAdd({prefillVal,view,onAdd,onClose,T,projectSuggestions,spocSuggestions}){
   const isProject=view==="project";
   const [title,setTitle]=useState("");
@@ -166,39 +165,22 @@ function QuickAdd({prefillVal,view,onAdd,onClose,T,projectSuggestions,spocSugges
   const ref=useRef();
   useEffect(()=>{setTimeout(()=>ref.current?.focus(),80);},[]);
   const ready=title.trim().length>0;
-  const secondSugg=isProject?spocSuggestions:projectSuggestions;
-  const secondPlaceholder=isProject?"👤  Person responsible…":"📁  Project name…";
   const inp=(ov={})=>({width:"100%",background:T.dark?"rgba(255,255,255,0.06)":"rgba(0,0,0,0.05)",border:`0.5px solid ${T.b1}`,borderRadius:12,padding:"11px 13px",fontSize:14,fontFamily:"inherit",color:T.text,outline:"none",letterSpacing:-0.15,...ov});
-
   const submit=()=>{
     if(!ready) return;
-    onAdd({
-      title:title.trim(),
-      project:isProject?prefillVal:second,
-      spoc:isProject?second:prefillVal,
-      due:"",priority:"medium",notifyHrs:24,
-    });
+    onAdd({title:title.trim(),project:isProject?prefillVal:second,spoc:isProject?second:prefillVal,due:"",priority:"medium",notifyHrs:24});
     setTitle(""); setSecond(""); ref.current?.focus();
   };
-
   return(
     <div style={{borderTop:`0.5px solid ${T.sep}`,padding:"14px 16px 16px",background:T.dark?"rgba(255,255,255,0.025)":"rgba(0,0,0,0.02)",animation:"slideUp 0.22s ease both"}}>
       <div style={{fontSize:11,fontWeight:700,color:T.textFaint,letterSpacing:0.8,marginBottom:9}}>QUICK ADD</div>
-      <input ref={ref} value={title} onChange={e=>setTitle(e.target.value)}
-        onKeyDown={e=>{if(e.key==="Enter")submit();if(e.key==="Escape")onClose();}}
-        placeholder="What needs to be done…"
-        style={{...inp({marginBottom:8,...(title?{border:`0.5px solid ${T.blue}66`,boxShadow:`0 0 0 3px ${T.blue}14`}:{})})}}
-      />
+      <input ref={ref} value={title} onChange={e=>setTitle(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")submit();if(e.key==="Escape")onClose();}} placeholder="What needs to be done…" style={{...inp({marginBottom:8,...(title?{border:`0.5px solid ${T.blue}66`,boxShadow:`0 0 0 3px ${T.blue}14`}:{})})}}/>
       <div style={{marginBottom:10}}>
-        <AutoInput value={second} onChange={setSecond} placeholder={secondPlaceholder} suggestions={secondSugg} T={T} style={inp()}/>
+        <AutoInput value={second} onChange={setSecond} placeholder={isProject?"👤  Person responsible…":"📁  Project name…"} suggestions={isProject?spocSuggestions:projectSuggestions} T={T} style={inp()}/>
       </div>
       <div style={{display:"flex",gap:8}}>
-        <button onClick={submit} style={{flex:1,padding:"10px",borderRadius:12,background:ready?T.blue:T.textGhost,border:"none",color:ready?"#fff":T.textFaint,fontSize:13,fontWeight:700,cursor:ready?"pointer":"default",fontFamily:"inherit",transition:"all 0.18s",boxShadow:ready?`0 2px 14px ${T.blue}44`:"none"}}>
-          Add ↵
-        </button>
-        <button onClick={onClose} style={{padding:"10px 16px",borderRadius:12,background:"transparent",border:`0.5px solid ${T.b1}`,color:T.textFaint,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>
-          Done
-        </button>
+        <button onClick={submit} style={{flex:1,padding:"10px",borderRadius:12,background:ready?T.blue:T.textGhost,border:"none",color:ready?"#fff":T.textFaint,fontSize:13,fontWeight:700,cursor:ready?"pointer":"default",fontFamily:"inherit",transition:"all 0.18s",boxShadow:ready?`0 2px 14px ${T.blue}44`:"none"}}>Add ↵</button>
+        <button onClick={onClose} style={{padding:"10px 16px",borderRadius:12,background:"transparent",border:`0.5px solid ${T.b1}`,color:T.textFaint,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Done</button>
       </div>
     </div>
   );
@@ -213,65 +195,22 @@ function GroupCard({name,tasks,view,onToggle,onDelete,onQuickAdd,idx,T,projectSu
   const pct=tasks.length>0?Math.round(((tasks.length-pending)/tasks.length)*100):0;
   const sorted=[...tasks].sort((a,b)=>{if(a.done!==b.done)return a.done?1:-1;return {high:0,medium:1,low:2}[a.priority]-{high:0,medium:1,low:2}[b.priority];});
   const allDone=pct===100;
-
   return(
     <div style={{...glass(T,20),overflow:"hidden",animation:`slideUp 0.42s ${idx*0.09}s both`}}>
-
-      {/* Header */}
       <div style={{display:"flex",alignItems:"center",padding:"13px 14px 12px",gap:8}}>
-        {/* Collapse area */}
         <button onClick={()=>setOpen(o=>!o)} style={{display:"flex",alignItems:"center",gap:9,flex:1,background:"transparent",border:"none",cursor:"pointer",textAlign:"left",padding:0,minWidth:0}}>
           <div style={{width:9,height:9,borderRadius:9,background:c.accent,flexShrink:0,boxShadow:T.dark?`0 0 10px ${c.glow}`:"none"}}/>
           <span style={{flex:1,fontSize:15,fontWeight:700,color:T.text,letterSpacing:-0.35,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{name}</span>
-          <span style={{fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:20,flexShrink:0,color:allDone?T.green:c.accent,background:allDone?T.statBg(T.green):T.statBg(c.accent),border:`0.5px solid ${allDone?T.statBorder(T.green):T.statBorder(c.accent)}`}}>
-            {allDone?"Done ✓":`${pending} left`}
-          </span>
-          <svg width="11" height="11" viewBox="0 0 12 12" fill="none" style={{transition:"transform 0.28s cubic-bezier(0.4,0,0.2,1)",transform:open?"rotate(0)":"rotate(-90deg)",color:T.textFaint,flexShrink:0}}>
-            <path d="M2 4.5L6 8.5L10 4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+          <span style={{fontSize:11,fontWeight:700,padding:"3px 10px",borderRadius:20,flexShrink:0,color:allDone?T.green:c.accent,background:allDone?T.statBg(T.green):T.statBg(c.accent),border:`0.5px solid ${allDone?T.statBorder(T.green):T.statBorder(c.accent)}`}}>{allDone?"Done ✓":`${pending} left`}</span>
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none" style={{transition:"transform 0.28s cubic-bezier(0.4,0,0.2,1)",transform:open?"rotate(0)":"rotate(-90deg)",color:T.textFaint,flexShrink:0}}><path d="M2 4.5L6 8.5L10 4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
         </button>
-
-        {/* Quick-add + button */}
-        <button
-          onClick={e=>{e.stopPropagation();if(!open)setOpen(true);setQuickAdd(q=>!q);}}
-          title={`Add task to ${name}`}
-          style={{
-            width:30,height:30,borderRadius:30,flexShrink:0,
-            background:quickAdd?c.accent:T.statBg(c.accent),
-            border:`0.5px solid ${c.accent}${quickAdd?"":"66"}`,
-            display:"flex",alignItems:"center",justifyContent:"center",
-            cursor:"pointer",color:quickAdd?"#fff":c.accent,
-            transition:"all 0.22s cubic-bezier(0.34,1.3,0.64,1)",
-            boxShadow:quickAdd?`0 2px 12px ${c.accent}55`:"none",
-          }}
-          onMouseDown={e=>e.currentTarget.style.transform="scale(0.88)"}
-          onMouseUp={e=>e.currentTarget.style.transform="scale(1)"}
-          onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}
-        >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"
-            style={{transition:"transform 0.25s cubic-bezier(0.34,1.3,0.64,1)",transform:quickAdd?"rotate(45deg)":"rotate(0)"}}>
-            <path d="M6 1V11M1 6H11" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
+        <button onClick={e=>{e.stopPropagation();if(!open)setOpen(true);setQuickAdd(q=>!q);}} style={{width:30,height:30,borderRadius:30,flexShrink:0,background:quickAdd?c.accent:T.statBg(c.accent),border:`0.5px solid ${c.accent}${quickAdd?"":"66"}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:quickAdd?"#fff":c.accent,transition:"all 0.22s cubic-bezier(0.34,1.3,0.64,1)"}} onMouseDown={e=>e.currentTarget.style.transform="scale(0.88)"} onMouseUp={e=>e.currentTarget.style.transform="scale(1)"} onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{transition:"transform 0.25s cubic-bezier(0.34,1.3,0.64,1)",transform:quickAdd?"rotate(45deg)":"rotate(0)"}}><path d="M6 1V11M1 6H11" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
         </button>
       </div>
-
-      {/* Progress bar */}
       {open&&<div style={{height:2,background:T.progressBg,margin:"0 16px"}}><div style={{height:"100%",width:`${pct}%`,borderRadius:2,transition:"width 0.6s cubic-bezier(0.4,0,0.2,1)",background:allDone?T.green:`linear-gradient(90deg,${c.accent},${c.accent}BB)`,boxShadow:T.dark?`0 0 6px ${c.glow}`:"none"}}/></div>}
-
-      {/* Task rows */}
-      {open&&sorted.map(task=>(
-        <TaskRow key={task.id} task={task} onToggle={onToggle} onDelete={onDelete} second={view==="project"?task.spoc:task.project} T={T}/>
-      ))}
-
-      {/* Inline quick-add */}
-      {quickAdd&&(
-        <QuickAdd
-          prefillVal={name} view={view}
-          onAdd={(form)=>{onQuickAdd(form);}}
-          onClose={()=>setQuickAdd(false)}
-          T={T} projectSuggestions={projectSuggestions} spocSuggestions={spocSuggestions}
-        />
-      )}
+      {open&&sorted.map(task=><TaskRow key={task.id} task={task} onToggle={onToggle} onDelete={onDelete} second={view==="project"?task.spoc:task.project} T={T}/>)}
+      {quickAdd&&<QuickAdd prefillVal={name} view={view} onAdd={onQuickAdd} onClose={()=>setQuickAdd(false)} T={T} projectSuggestions={projectSuggestions} spocSuggestions={spocSuggestions}/>}
     </div>
   );
 }
@@ -283,18 +222,28 @@ function NotifBanner({T,onGrant}){
   return(
     <div style={{...glass(T,16),marginBottom:12,padding:"14px 16px",display:"flex",alignItems:"center",gap:12,border:`0.5px solid ${T.orange}55`}}>
       <span style={{fontSize:22}}>🔔</span>
-      <div style={{flex:1}}>
-        <div style={{fontSize:13,fontWeight:700,color:T.text,letterSpacing:-0.2}}>Enable Notifications</div>
-        <div style={{fontSize:11,color:T.textFaint,marginTop:2}}>Get reminded before tasks are due</div>
+      <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:T.text}}>Enable Notifications</div><div style={{fontSize:11,color:T.textFaint,marginTop:2}}>Get reminded before tasks are due</div></div>
+      <button onClick={async()=>{const r=await askNotifPermission();setPerm(r);if(r==="granted")onGrant();}} style={{padding:"8px 16px",borderRadius:20,background:T.orange,border:"none",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap"}}>Allow</button>
+    </div>
+  );
+}
+
+// ── Sync Banner ───────────────────────────────────────────────────────────────
+function SyncBanner({syncing,error,T}){
+  if(!syncing&&!error) return null;
+  return(
+    <div style={{position:"fixed",top:0,left:"50%",transform:"translateX(-50%)",zIndex:500,maxWidth:430,width:"100%",padding:"10px 20px 0",pointerEvents:"none"}}>
+      <div style={{background:error?T.red:T.blue,borderRadius:12,padding:"8px 14px",display:"flex",alignItems:"center",gap:8,boxShadow:`0 4px 20px ${error?T.red:T.blue}55`}}>
+        {syncing&&!error&&<div style={{width:10,height:10,borderRadius:10,border:"2px solid rgba(255,255,255,0.4)",borderTop:"2px solid #fff",animation:"spin 0.7s linear infinite",flexShrink:0}}/>}
+        <span style={{fontSize:12,fontWeight:700,color:"#fff"}}>{error?"Sync error — check connection":syncing?"Syncing…":""}</span>
       </div>
-      <button onClick={async()=>{const r=await askNotifPermission();setPerm(r);if(r==="granted")onGrant();}} style={{padding:"8px 16px",borderRadius:20,background:T.orange,border:"none",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap",boxShadow:`0 2px 12px ${T.orange}55`}}>Allow</button>
     </div>
   );
 }
 
 // ── Full Add Sheet ────────────────────────────────────────────────────────────
-function AddSheet({onAdd,onClose,T,projectSuggestions,spocSuggestions,prefill}){
-  const [form,setForm]=useState({title:"",project:prefill?.project||"",spoc:prefill?.spoc||"",due:"",priority:"medium",notifyHrs:24});
+function AddSheet({onAdd,onClose,T,projectSuggestions,spocSuggestions}){
+  const [form,setForm]=useState({title:"",project:"",spoc:"",due:"",priority:"medium",notifyHrs:24});
   const titleRef=useRef();
   useEffect(()=>{setTimeout(()=>titleRef.current?.focus(),160);},[]);
   const inp=(ov={})=>({width:"100%",background:T.g3,border:`0.5px solid ${T.b1}`,borderRadius:14,padding:"13px 14px",fontSize:14,fontFamily:"inherit",color:T.text,outline:"none",letterSpacing:-0.15,transition:"border 0.18s, box-shadow 0.18s",...ov});
@@ -324,9 +273,7 @@ function AddSheet({onAdd,onClose,T,projectSuggestions,spocSuggestions,prefill}){
           </div>
           {lbl("🔔 NOTIFY ME BEFORE DUE")}
           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:form.notifyHrs>0?8:16}}>
-            {PRESETS.map(p=>(
-              <button key={p.v} onClick={()=>setForm(f=>({...f,notifyHrs:p.v}))} style={{padding:"7px 14px",borderRadius:20,fontFamily:"inherit",border:`0.5px solid ${form.notifyHrs===p.v?T.blue+"88":T.b1}`,background:form.notifyHrs===p.v?`${T.blue}18`:T.g3,color:form.notifyHrs===p.v?T.blue:T.textFaint,fontSize:12,fontWeight:700,cursor:"pointer",transition:"all 0.18s"}}>{p.l}</button>
-            ))}
+            {PRESETS.map(p=>(<button key={p.v} onClick={()=>setForm(f=>({...f,notifyHrs:p.v}))} style={{padding:"7px 14px",borderRadius:20,fontFamily:"inherit",border:`0.5px solid ${form.notifyHrs===p.v?T.blue+"88":T.b1}`,background:form.notifyHrs===p.v?`${T.blue}18`:T.g3,color:form.notifyHrs===p.v?T.blue:T.textFaint,fontSize:12,fontWeight:700,cursor:"pointer",transition:"all 0.18s"}}>{p.l}</button>))}
           </div>
           {form.notifyHrs>0&&<div style={{fontSize:11,color:T.textFaint,marginBottom:16}}>Notify {form.notifyHrs>=24?`${form.notifyHrs/24} day(s)`:`${form.notifyHrs}h`} before due</div>}
           <button onClick={()=>{if(!ready)return;onAdd(form);}} style={{width:"100%",padding:"16px",borderRadius:16,fontFamily:"inherit",background:ready?T.blue:T.textGhost,border:"none",color:ready?"#FFFFFF":T.textFaint,fontSize:17,fontWeight:800,letterSpacing:-0.4,cursor:ready?"pointer":"default",boxShadow:ready?`0 4px 22px ${T.blue}55`:"none",transition:"all 0.25s cubic-bezier(0.34,1.2,0.64,1)"}}>Add Task</button>
@@ -338,7 +285,7 @@ function AddSheet({onAdd,onClose,T,projectSuggestions,spocSuggestions,prefill}){
 
 // ── Theme Toggle ──────────────────────────────────────────────────────────────
 function ThemeToggle({dark,onToggle,T}){
-  return(<button onClick={onToggle} style={{width:34,height:34,borderRadius:34,background:T.toggleBg,border:`0.5px solid ${T.toggleBorder}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",transition:"all 0.25s",color:T.textSub,flexShrink:0}} onMouseDown={e=>e.currentTarget.style.transform="scale(0.88)"} onMouseUp={e=>e.currentTarget.style.transform="scale(1)"} onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}>{dark?<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.5"/><path d="M8 1.5V2.5M8 13.5V14.5M1.5 8H2.5M13.5 8H14.5M3.4 3.4L4.1 4.1M11.9 11.9L12.6 12.6M12.6 3.4L11.9 4.1M4.1 11.9L3.4 12.6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>:<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}</button>);
+  return(<button onClick={onToggle} style={{width:34,height:34,borderRadius:34,background:T.toggleBg,border:`0.5px solid ${T.toggleBorder}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:T.textSub,flexShrink:0}} onMouseDown={e=>e.currentTarget.style.transform="scale(0.88)"} onMouseUp={e=>e.currentTarget.style.transform="scale(1)"} onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}>{dark?<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.5"/><path d="M8 1.5V2.5M8 13.5V14.5M1.5 8H2.5M13.5 8H14.5M3.4 3.4L4.1 4.1M11.9 11.9L12.6 12.6M12.6 3.4L11.9 4.1M4.1 11.9L3.4 12.6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>:<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}</button>);
 }
 
 // ── App ───────────────────────────────────────────────────────────────────────
@@ -347,22 +294,67 @@ export default function App(){
   const [view,setView]=useState("project");
   const [filter,setFilter]=useState("all");
   const [showAdd,setShowAdd]=useState(false);
-  const [loaded,setLoaded]=useState(false);
   const [dark,setDark]=useState(true);
   const [time,setTime]=useState(new Date());
+  const [syncing,setSyncing]=useState(false);
+  const [syncError,setSyncError]=useState(false);
   const T=makeTheme(dark);
 
+  // ── Load from Supabase ──
   useEffect(()=>{
-    try{const s=localStorage.getItem("taskapp_v1");if(s){const p=JSON.parse(s);setTasks(p.tasks||SAMPLE);setDark(p.dark!==undefined?p.dark:true);}else setTasks(SAMPLE);}catch{setTasks(SAMPLE);}
-    setLoaded(true);
+    const saved=localStorage.getItem("theme_pref");
+    if(saved!==null) setDark(saved==="dark");
+    fetchTasks();
+    // Real-time subscription — updates instantly across all devices
+    const channel=supabase.channel("tasks-sync").on("postgres_changes",{event:"*",schema:"public",table:"tasks"},()=>{ fetchTasks(); }).subscribe();
+    return ()=>supabase.removeChannel(channel);
   },[]);
-  useEffect(()=>{if(loaded){try{localStorage.setItem("taskapp_v1",JSON.stringify({tasks,dark}));}catch{}scheduleNotifications(tasks);}},[tasks,dark,loaded]);
-  useEffect(()=>{const t=setInterval(()=>setTime(new Date()),30000);return()=>clearInterval(t);},[]);
 
-  const toggle=id=>setTasks(t=>t.map(x=>x.id===id?{...x,done:!x.done}:x));
-  const remove=id=>setTasks(t=>t.filter(x=>x.id!==id));
-  const add=form=>{setTasks(t=>[...t,{...form,id:Date.now(),done:false}]);setShowAdd(false);};
-  const quickAdd=form=>{setTasks(t=>[...t,{...form,id:Date.now(),done:false}]);};
+  const fetchTasks=async()=>{
+    setSyncError(false);
+    const {data,error}=await supabase.from("tasks").select("*").order("created_at",{ascending:true});
+    if(error){ setSyncError(true); return; }
+    // Map snake_case from DB to camelCase for app
+    setTasks((data||[]).map(t=>({...t,notifyHrs:t.notify_hrs??24})));
+  };
+
+  useEffect(()=>{ localStorage.setItem("theme_pref",dark?"dark":"light"); },[dark]);
+  useEffect(()=>{const t=setInterval(()=>setTime(new Date()),30000);return()=>clearInterval(t);},[]);
+  useEffect(()=>{ scheduleNotifications(tasks); },[tasks]);
+
+  // ── CRUD via Supabase ──
+  const addTask=async(form)=>{
+    setSyncing(true);
+    const {error}=await supabase.from("tasks").insert([{
+      title:form.title, project:form.project, spoc:form.spoc,
+      due:form.due||null, priority:form.priority,
+      done:false, notify_hrs:form.notifyHrs,
+    }]);
+    setSyncing(false);
+    if(error) setSyncError(true);
+    setShowAdd(false);
+  };
+
+  const toggleTask=async(id,newDone)=>{
+    setTasks(t=>t.map(x=>x.id===id?{...x,done:newDone}:x)); // optimistic
+    await supabase.from("tasks").update({done:newDone}).eq("id",id);
+  };
+
+  const deleteTask=async(id)=>{
+    setTasks(t=>t.filter(x=>x.id!==id)); // optimistic
+    await supabase.from("tasks").delete().eq("id",id);
+  };
+
+  const quickAdd=async(form)=>{
+    setSyncing(true);
+    const {error}=await supabase.from("tasks").insert([{
+      title:form.title, project:form.project, spoc:form.spoc,
+      due:form.due||null, priority:form.priority,
+      done:false, notify_hrs:form.notifyHrs,
+    }]);
+    setSyncing(false);
+    if(error) setSyncError(true);
+  };
 
   const projectSuggestions=[...new Set(tasks.map(t=>t.project).filter(Boolean))];
   const spocSuggestions=[...new Set(tasks.map(t=>t.spoc).filter(Boolean))];
@@ -395,9 +387,11 @@ export default function App(){
         @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.65;transform:scale(0.85)}}
         @keyframes breathe{0%,100%{opacity:1}50%{opacity:0.6}}
         @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+        @keyframes spin{to{transform:rotate(360deg)}}
       `}</style>
       <svg style={{position:"fixed",top:0,left:0,width:0,height:0}}><filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.68" numOctaves="3" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter></svg>
       <div style={{position:"fixed",inset:0,filter:"url(#grain)",opacity:T.noiseOp,pointerEvents:"none",zIndex:9999}}/>
+      <SyncBanner syncing={syncing} error={syncError} T={T}/>
 
       <div style={{width:"100%",maxWidth:430,minHeight:"100vh",background:T.bg,fontFamily:"'Outfit',system-ui,sans-serif",color:T.text,position:"relative",overflow:"hidden",transition:"background 0.4s ease"}}>
         <div style={{position:"fixed",top:-150,left:"50%",transform:"translateX(-50%)",width:520,height:520,background:T.ambientTop,pointerEvents:"none",zIndex:0,animation:"breathe 6s ease-in-out infinite"}}/>
@@ -454,11 +448,7 @@ export default function App(){
           <NotifBanner T={T} onGrant={()=>scheduleNotifications(tasks)}/>
           {groups.length===0&&(<div style={{textAlign:"center",padding:"70px 0",animation:"fadeIn 0.5s"}}><div style={{fontSize:54,marginBottom:14}}>✦</div><div style={{fontSize:18,fontWeight:800,color:T.textFaint,letterSpacing:-0.4,marginBottom:6}}>Nothing here</div><div style={{fontSize:14,color:T.textGhost}}>Tap + to add your first task</div></div>)}
           {groups.map(([name,items],i)=>(
-            <GroupCard key={name} name={name} tasks={items} view={view}
-              onToggle={toggle} onDelete={remove} onQuickAdd={quickAdd}
-              idx={i} T={T}
-              projectSuggestions={projectSuggestions} spocSuggestions={spocSuggestions}
-            />
+            <GroupCard key={name} name={name} tasks={items} view={view} onToggle={toggleTask} onDelete={deleteTask} onQuickAdd={quickAdd} idx={i} T={T} projectSuggestions={projectSuggestions} spocSuggestions={spocSuggestions}/>
           ))}
         </div>
 
@@ -469,7 +459,7 @@ export default function App(){
           {[{svg:<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>,l:"Focus",on:false},{svg:<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.6"/><path d="M4 20C4 16.7 7.6 14 12 14C16.4 14 20 16.7 20 20" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>,l:"People",on:false}].map((t,i)=>(<div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,color:T.textFaint,cursor:"pointer"}}>{t.svg}<span style={{fontSize:10,fontWeight:700,letterSpacing:0.2}}>{t.l}</span></div>))}
         </div>
       </div>
-      {showAdd&&<AddSheet onAdd={add} onClose={()=>setShowAdd(false)} T={T} projectSuggestions={projectSuggestions} spocSuggestions={spocSuggestions}/>}
+      {showAdd&&<AddSheet onAdd={addTask} onClose={()=>setShowAdd(false)} T={T} projectSuggestions={projectSuggestions} spocSuggestions={spocSuggestions}/>}
     </div>
   );
 }
